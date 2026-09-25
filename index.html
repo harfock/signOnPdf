@@ -13,17 +13,16 @@
     <div class="logo">PDF Signer</div>
 
     <button id="uploadBtn" class="primary-btn">
-      Upload PDF
+      Upload File
     </button>
 
     <input
       type="file"
       id="pdfInput"
-      accept="application/pdf"
+      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
       hidden
     >
   </header>
-
 
   <main class="app">
 
@@ -31,77 +30,58 @@
       <div class="welcome-box">
         <div class="pdf-icon">PDF</div>
 
-        <h1>Sign your PDF</h1>
+        <h1>Sign your document</h1>
 
         <p>
-          Upload a PDF to add your signature, name and date.
+          Upload PDF, JPG, JPEG, PNG, WEBP, HEIC or HEIF.
+          Image files are converted to PDF automatically.
         </p>
 
         <button id="welcomeUpload" class="primary-btn large">
-          Choose PDF
+          Choose File
         </button>
+
+        <div class="format-note">
+          PDF · JPG · JPEG · PNG · WEBP · HEIC · HEIF
+        </div>
       </div>
     </section>
-
 
     <section id="editor" class="editor hidden">
 
       <div class="toolbar">
 
-        <button id="prevPage" class="tool-btn">
-          ◀
-        </button>
+        <button id="prevPage" class="tool-btn">◀</button>
 
-        <span id="pageInfo">
-          Page 1 / 1
-        </span>
+        <span id="pageInfo">Page 1 / 1</span>
 
-        <button id="nextPage" class="tool-btn">
-          ▶
-        </button>
+        <button id="nextPage" class="tool-btn">▶</button>
 
         <span class="separator"></span>
 
-        <button id="zoomOut" class="tool-btn">
-          −
-        </button>
+        <button id="zoomOut" class="tool-btn">−</button>
 
-        <span id="zoomInfo">
-          100%
-        </span>
+        <span id="zoomInfo">100%</span>
 
-        <button id="zoomIn" class="tool-btn">
-          +
-        </button>
+        <button id="zoomIn" class="tool-btn">+</button>
 
-        <button id="fitPage" class="tool-btn">
-          Fit
-        </button>
+        <button id="fitPage" class="tool-btn">Fit</button>
 
-        <button id="todayStamp" class="tool-btn">
-          Today
-        </button>
+        <button id="todayStamp" class="tool-btn">Today</button>
 
       </div>
 
-
       <div id="pdfArea" class="pdf-area">
-
-        <div id="pdfContainer" class="pdf-container">
-          <!-- PDF pages appear here -->
-        </div>
-
+        <div id="pdfContainer" class="pdf-container"></div>
       </div>
 
     </section>
 
   </main>
 
-
   <footer class="footer">
     <span>PDF Signer — V1</span>
   </footer>
-
 
   <!-- PDF.js -->
   <script
@@ -109,18 +89,17 @@
     type="module">
   </script>
 
+  <!-- jsPDF: used to convert image files to PDF in the browser -->
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js">
+  </script>
+
+  <!-- HEIC/HEIF decoder -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js">
+  </script>
+
   <script src="app.js" type="module"></script>
-
-<script>
-  document.getElementById("uploadBtn").addEventListener("click", () => {
-    document.getElementById("pdfInput").click();
-  });
-
-  document.getElementById("welcomeUpload").addEventListener("click", () => {
-    document.getElementById("pdfInput").click();
-  });
-</script>
-
 
 </body>
 </html>
