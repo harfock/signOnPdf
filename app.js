@@ -92,9 +92,35 @@ function textAnnotationDataUrl(text,fontSize,width,height){
 let exportedBlob=null,exportedUrl=null,exportedFilename="document.pdf";
 function closeExportPreview(){
   exportResult.classList.add("hidden");
-  if(exportPreview) exportPreview.src="about:blank";
+  if(exportPreview) exportPreview.innerHTML="";
   if(exportedUrl){URL.revokeObjectURL(exportedUrl);exportedUrl=null;}
   exportedBlob=null;
+}
+
+async function renderExportPreview(bytes){
+  exportPreview.innerHTML="";
+  const task=pdfjsLib.getDocument({data:Uint8Array.from(bytes)});
+  const doc=await task.promise;
+  const availableWidth=Math.max(280, exportPreview.clientWidth-36);
+  for(let i=1;i<=doc.numPages;i++){
+    const page=await doc.getPage(i);
+    const base=page.getViewport({scale:1});
+    const scale=Math.min(1.5, availableWidth/base.width);
+    const viewport=page.getViewport({scale});
+    const wrapper=document.createElement("div");
+    wrapper.className="export-preview-page";
+    wrapper.style.width=`${viewport.width}px`;
+    wrapper.style.height=`${viewport.height}px`;
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.ceil(viewport.width);
+    canvas.height=Math.ceil(viewport.height);
+    canvas.style.width=`${viewport.width}px`;
+    canvas.style.height=`${viewport.height}px`;
+    wrapper.appendChild(canvas);
+    exportPreview.appendChild(wrapper);
+    const ctx=canvas.getContext("2d",{alpha:false});
+    await page.render({canvasContext:ctx,viewport}).promise;
+  }
 }
 async function saveExportedPdf(){
   if(!exportedBlob)return;
@@ -151,8 +177,8 @@ async function exportDocument(){
     const safeBase=(sourceFileName||"document").replace(/\.[^.]+$/i,"").trim()||"document";
     exportedFilename=`${safeBase.slice(0,8)}.pdf`;
     exportFileName.textContent=exportedFilename;
-    exportPreview.src=exportedUrl;
     exportResult.classList.remove("hidden");
+    await renderExportPreview(bytes);
   }catch(e){console.error("PDF export failed:",e);alert(`The PDF could not be exported.\n\n${e?.message||e}`)}
   finally{exportPdf.disabled=false;exportPdf.textContent="Export PDF"}
 }

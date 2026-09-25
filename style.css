@@ -3,7 +3,7 @@
 .export-result-dialog{width:min(1100px,100%);height:100%;background:#fff;border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
 .export-result-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #ddd;flex:0 0 auto}
 .export-result-header h2{margin:0;font-size:18px}.export-file-name{font-size:12px;color:#667085;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70vw}
-#exportPreview{width:100%;flex:1;min-height:0;border:0;background:#525659}
+.export-preview{width:100%;flex:1;min-height:0;overflow:auto;background:#525659;padding:18px;display:flex;flex-direction:column;align-items:center;gap:18px;-webkit-overflow-scrolling:touch}.export-preview-page{position:relative;background:#fff;box-shadow:0 3px 12px #00000059;max-width:100%;flex:0 0 auto}.export-preview-page canvas{display:block;max-width:100%;height:auto}
 .export-result-actions{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #ddd;flex:0 0 auto;flex-wrap:wrap}
 .export-result-actions button{min-height:44px}.export-help{font-size:12px;color:#667085;padding:0 12px 10px;flex:0 0 auto}
 @media(max-width:700px){.export-result-modal{padding:0}.export-result-dialog{border-radius:0}.export-result-actions{flex-direction:column}.export-result-actions button{width:100%}.export-help{padding-bottom:max(10px,env(safe-area-inset-bottom))}}
