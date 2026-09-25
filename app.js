@@ -3,6 +3,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/p
 const $=id=>document.getElementById(id);
 const pdfInput=$("pdfInput"),uploadBtn=$("uploadBtn"),welcomeUpload=$("welcomeUpload"),welcome=$("welcome"),editor=$("editor"),pdfContainer=$("pdfContainer"),pdfArea=$("pdfArea");
 const prevPage=$("prevPage"),nextPage=$("nextPage"),pageInfo=$("pageInfo"),zoomOut=$("zoomOut"),zoomIn=$("zoomIn"),fitPage=$("fitPage"),zoomInfo=$("zoomInfo"),addText=$("addText"),addName=$("addName"),addDate=$("addDate"),addSignature=$("addSignature"),undoBtn=$("undo"),deleteSelected=$("deleteSelected"),exportPdf=$("exportPdf");
+const exportResult=$("exportResult"),exportPreview=$("exportPreview"),exportFileName=$("exportFileName"),savePdf=$("savePdf"),openPdfTab=$("openPdfTab"),closeExportResult=$("closeExportResult");
 const textDialog=$("textDialog"),textInput=$("textInput"),textDialogTitle=$("textDialogTitle"),textCancel=$("textCancel"),textConfirm=$("textConfirm");
 const signatureDialog=$("signatureDialog"),signatureCanvas=$("signatureCanvas"),signatureClear=$("signatureClear"),signatureCancel=$("signatureCancel"),signatureConfirm=$("signatureConfirm"),savedSignatures=$("savedSignatures");
 let pdfDocument=null,currentPage=1,zoom=1,renderVersion=0,sourcePdfBytes=null,sourceFileName="document",selectedId=null,pendingTextType="text",history=[],annotations=new Map(),editingId=null;
@@ -88,17 +89,58 @@ function textAnnotationDataUrl(text,fontSize,width,height){
   ctx.fillText(text,5, height/2);
   return c.toDataURL("image/png");
 }
-let exportWindow=null;
-async function exportDocument(){if(!sourcePdfBytes){alert("Please upload a document first.");return}const L=window.PDFLib;if(!L?.PDFDocument){alert("PDF export library is unavailable. Please reload the page.");return}
-// Open a window during the user gesture. This is important for iPhone/Safari, where a later async download can be blocked.
-try{exportWindow=window.open("about:blank","_blank");if(exportWindow)exportWindow.document.write("<p style='font-family:Arial;padding:24px'>Preparing your PDF…</p>")}catch{exportWindow=null}
-exportPdf.disabled=true;exportPdf.textContent="Exporting…";
-try{const out=await L.PDFDocument.load(sourcePdfBytes),pages=out.getPages();
-for(let i=0;i<pages.length;i++){const page=pages[i],pw=page.getWidth(),ph=page.getHeight(),scaleX=pw/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).width,scaleY=ph/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).height;for(const a of annotations.get(i+1)||[]){const x=Math.max(0,Math.min(a.x*scaleX,pw-a.w*scaleX)),top=Math.max(0,Math.min(a.y*scaleY,ph-a.h*scaleY)),w=a.w*scaleX,h=a.h*scaleY,y=ph-top-h;if(a.type==="signature"){const img=await out.embedPng(dataUrlBytes(a.data));page.drawImage(img,{x,y,width:w,height:h})}else{const textPng=textAnnotationDataUrl(a.text,a.fontSize*scaleX,w,h);const img=await out.embedPng(dataUrlBytes(textPng));page.drawImage(img,{x,y,width:w,height:h})}}}
-const bytes=await out.save();const blob=new Blob([bytes],{type:"application/pdf"}),url=URL.createObjectURL(blob);const filename=`${sourceFileName}-signed.pdf`;
-if(exportWindow&&!exportWindow.closed){exportWindow.location.href=url;try{exportWindow.document.title=filename}catch{}}else{const link=document.createElement("a");link.href=url;link.download=filename;link.target="_blank";document.body.appendChild(link);link.click();link.remove()}
-setTimeout(()=>URL.revokeObjectURL(url),60000);
-}catch(e){console.error("PDF export failed:",e);if(exportWindow&&!exportWindow.closed){try{exportWindow.close()}catch{}}alert(`The PDF could not be exported.\n\n${e?.message||e}`)}finally{exportPdf.disabled=false;exportPdf.textContent="Export PDF"}}
+let exportedBlob=null,exportedUrl=null,exportedFilename="signed.pdf";
+function closeExportPreview(){
+  exportResult.classList.add("hidden");
+  if(exportPreview) exportPreview.src="about:blank";
+  if(exportedUrl){URL.revokeObjectURL(exportedUrl);exportedUrl=null;}
+  exportedBlob=null;
+}
+async function saveExportedPdf(){
+  if(!exportedBlob)return;
+  const file=new File([exportedBlob],exportedFilename,{type:"application/pdf"});
+  try{
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+      await navigator.share({files:[file],title:exportedFilename});
+      return;
+    }
+  }catch(e){
+    if(e?.name==="AbortError")return;
+  }
+  const link=document.createElement("a");link.href=exportedUrl;link.download=exportedFilename;document.body.appendChild(link);link.click();link.remove();
+}
+function openExportedInNewTab(){if(exportedUrl)window.open(exportedUrl,"_blank");}
+savePdf.onclick=saveExportedPdf;openPdfTab.onclick=openExportedInNewTab;closeExportResult.onclick=closeExportPreview;
+async function exportDocument(){
+  if(!sourcePdfBytes){alert("Please upload a document first.");return}
+  const L=window.PDFLib;if(!L?.PDFDocument){alert("PDF export library is unavailable. Please reload the page.");return}
+  exportPdf.disabled=true;exportPdf.textContent="Exporting…";
+  try{
+    const out=await L.PDFDocument.load(Uint8Array.from(sourcePdfBytes));
+    const pages=out.getPages();
+    for(let i=0;i<pages.length;i++){
+      const page=pages[i],pw=page.getWidth(),ph=page.getHeight();
+      const viewerPage=await pdfDocument.getPage(i+1);const base=viewerPage.getViewport({scale:1});
+      const scaleX=pw/base.width,scaleY=ph/base.height;
+      for(const a of annotations.get(i+1)||[]){
+        const x=Math.max(0,Math.min(a.x*scaleX,pw-a.w*scaleX));
+        const top=Math.max(0,Math.min(a.y*scaleY,ph-a.h*scaleY));
+        const w=a.w*scaleX,h=a.h*scaleY,y=ph-top-h;
+        const data=a.type==="signature"?a.data:textAnnotationDataUrl(a.text,a.fontSize*scaleX,w,h);
+        const img=await out.embedPng(dataUrlBytes(data));
+        page.drawImage(img,{x,y,width:w,height:h});
+      }
+    }
+    const bytes=await out.save();
+    exportedBlob=new Blob([bytes],{type:"application/pdf"});
+    exportedUrl=URL.createObjectURL(exportedBlob);
+    exportedFilename=`${sourceFileName}-signed.pdf`;
+    exportFileName.textContent=exportedFilename;
+    exportPreview.src=exportedUrl;
+    exportResult.classList.remove("hidden");
+  }catch(e){console.error("PDF export failed:",e);alert(`The PDF could not be exported.\n\n${e?.message||e}`)}
+  finally{exportPdf.disabled=false;exportPdf.textContent="Export PDF"}
+}
 exportPdf.onclick=exportDocument;
 window.addEventListener("resize",()=>{if(signatureDialog&&!signatureDialog.classList.contains("hidden")){const had=signatureHasInk;const data=had?signatureCanvas.toDataURL("image/png"):null;resizeSig();if(data){const img=new Image();img.onload=()=>{sigCtx.drawImage(img,0,0,signatureCanvas.clientWidth,signatureCanvas.clientHeight);signatureHasInk=true};img.src=data}}});
 updateControls();
