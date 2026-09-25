@@ -1,105 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PDF Signer</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PDF Signer</title>
+<link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-  <header class="topbar">
-    <div class="logo">PDF Signer</div>
-
-    <button id="uploadBtn" class="primary-btn">
-      Upload File
-    </button>
-
-    <input
-      type="file"
-      id="pdfInput"
-      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
-      hidden
-    >
-  </header>
-
-  <main class="app">
-
-    <section id="welcome" class="welcome">
-      <div class="welcome-box">
-        <div class="pdf-icon">PDF</div>
-
-        <h1>Sign your document</h1>
-
-        <p>
-          Upload PDF, JPG, JPEG, PNG, WEBP, HEIC or HEIF.
-          Image files are converted to PDF automatically.
-        </p>
-
-        <button id="welcomeUpload" class="primary-btn large">
-          Choose File
-        </button>
-
-        <div class="format-note">
-          PDF · JPG · JPEG · PNG · WEBP · HEIC · HEIF
-        </div>
-      </div>
-    </section>
-
-    <section id="editor" class="editor hidden">
-
-      <div class="toolbar">
-
-        <button id="prevPage" class="tool-btn">◀</button>
-
-        <span id="pageInfo">Page 1 / 1</span>
-
-        <button id="nextPage" class="tool-btn">▶</button>
-
-        <span class="separator"></span>
-
-        <button id="zoomOut" class="tool-btn">−</button>
-
-        <span id="zoomInfo">100%</span>
-
-        <button id="zoomIn" class="tool-btn">+</button>
-
-        <button id="fitPage" class="tool-btn">Fit</button>
-
-        <button id="todayStamp" class="tool-btn">Today</button>
-
-      </div>
-
-      <div id="pdfArea" class="pdf-area">
-        <div id="pdfContainer" class="pdf-container"></div>
-      </div>
-
-    </section>
-
-  </main>
-
-  <footer class="footer">
-    <span>PDF Signer — V1</span>
-  </footer>
-
-  <!-- PDF.js -->
-  <script
-    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs"
-    type="module">
-  </script>
-
-  <!-- jsPDF: used to convert image files to PDF in the browser -->
-  <script
-    src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js">
-  </script>
-
-  <!-- HEIC/HEIF decoder -->
-  <script
-    src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js">
-  </script>
-
-  <script src="app.js" type="module"></script>
-
-</body>
-</html>
+<header class="topbar"><div class="logo">PDF Signer</div><button id="uploadBtn" class="primary-btn">Upload File</button><input id="pdfInput" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif" hidden></header>
+<main class="app">
+<section id="welcome" class="welcome"><div class="welcome-box"><div class="pdf-icon">PDF</div><h1>Sign your document</h1><p>Upload PDF, JPG, JPEG, WEBP, PNG, HEIC or HEIF. Images are converted to PDF automatically.</p><button id="welcomeUpload" class="primary-btn large">Choose File</button><div class="format-note">All editing is performed locally in your browser.</div></div></section>
+<section id="editor" class="editor hidden">
+<div class="toolbar">
+<button id="prevPage" class="tool-btn">◀</button><span id="pageInfo">Page 1 / 1</span><button id="nextPage" class="tool-btn">▶</button><span class="separator"></span>
+<button id="zoomOut" class="tool-btn">−</button><span id="zoomInfo">100%</span><button id="zoomIn" class="tool-btn">+</button><button id="fitPage" class="tool-btn">Fit</button><span class="separator"></span>
+<button id="addText" class="tool-btn">Text</button><button id="addName" class="tool-btn">Name</button><button id="addDate" class="tool-btn">Date</button><button id="addSignature" class="tool-btn">Signature</button><button id="undo" class="tool-btn">Undo</button><button id="deleteSelected" class="tool-btn danger">Delete</button><button id="exportPdf" class="primary-btn export-btn">Export PDF</button>
+</div>
+<div id="pdfArea" class="pdf-area"><div id="pdfContainer" class="pdf-container"></div></div>
+</section></main>
+<footer class="footer">PDF Signer — Full V1</footer>
+<div id="textDialog" class="modal hidden"><div class="dialog"><h2 id="textDialogTitle">Add text</h2><input id="textInput" type="text" autocomplete="off" placeholder="Enter text"><div class="dialog-actions"><button id="textCancel" class="tool-btn">Cancel</button><button id="textConfirm" class="primary-btn">Add</button></div></div></div>
+<div id="signatureDialog" class="modal hidden"><div class="dialog signature-dialog"><h2>Draw signature</h2><canvas id="signatureCanvas"></canvas><div class="signature-actions"><button id="signatureClear" class="tool-btn">Clear</button><button id="signatureCancel" class="tool-btn">Cancel</button><button id="signatureConfirm" class="primary-btn">Use Signature</button></div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+<script type="module" src="app.js"></script>
+</body></html>
