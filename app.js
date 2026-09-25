@@ -89,7 +89,7 @@ function textAnnotationDataUrl(text,fontSize,width,height){
   ctx.fillText(text,5, height/2);
   return c.toDataURL("image/png");
 }
-let exportedBlob=null,exportedUrl=null,exportedFilename="signed.pdf";
+let exportedBlob=null,exportedUrl=null,exportedFilename="document.pdf";
 function closeExportPreview(){
   exportResult.classList.add("hidden");
   if(exportPreview) exportPreview.src="about:blank";
@@ -98,19 +98,33 @@ function closeExportPreview(){
 }
 async function saveExportedPdf(){
   if(!exportedBlob)return;
+  const link=document.createElement("a");
+  link.href=exportedUrl;
+  link.download=exportedFilename;
+  link.rel="noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+async function shareExportedPdf(){
+  if(!exportedBlob)return;
   const file=new File([exportedBlob],exportedFilename,{type:"application/pdf"});
+  if(!navigator.share){
+    alert("Sharing is not supported by this browser. Use Save to Files instead.");
+    return;
+  }
   try{
-    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
-      await navigator.share({files:[file],title:exportedFilename});
+    if(navigator.canShare && !navigator.canShare({files:[file]})){
+      await navigator.share({title:exportedFilename,text:"Signed PDF"});
       return;
     }
+    await navigator.share({files:[file],title:exportedFilename});
   }catch(e){
-    if(e?.name==="AbortError")return;
+    if(e?.name!=="AbortError")console.error("Share failed:",e);
   }
-  const link=document.createElement("a");link.href=exportedUrl;link.download=exportedFilename;document.body.appendChild(link);link.click();link.remove();
 }
 function openExportedInNewTab(){if(exportedUrl)window.open(exportedUrl,"_blank");}
-savePdf.onclick=saveExportedPdf;openPdfTab.onclick=openExportedInNewTab;closeExportResult.onclick=closeExportPreview;
+savePdf.onclick=saveExportedPdf;sharePdf.onclick=shareExportedPdf;openPdfTab.onclick=openExportedInNewTab;closeExportResult.onclick=closeExportPreview;
 async function exportDocument(){
   if(!sourcePdfBytes){alert("Please upload a document first.");return}
   const L=window.PDFLib;if(!L?.PDFDocument){alert("PDF export library is unavailable. Please reload the page.");return}
@@ -134,7 +148,8 @@ async function exportDocument(){
     const bytes=await out.save();
     exportedBlob=new Blob([bytes],{type:"application/pdf"});
     exportedUrl=URL.createObjectURL(exportedBlob);
-    exportedFilename=`${sourceFileName}-signed.pdf`;
+    const safeBase=(sourceFileName||"document").replace(/\.[^.]+$/i,"").trim()||"document";
+    exportedFilename=`${safeBase.slice(0,8)}.pdf`;
     exportFileName.textContent=exportedFilename;
     exportPreview.src=exportedUrl;
     exportResult.classList.remove("hidden");
