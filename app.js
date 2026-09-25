@@ -1,69 +1,133 @@
-const pdfjsLib = window.pdfjsLib;
+import * as pdfjsLib from
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+
+
+/* --------------------------------
+   PDF.js worker
+-------------------------------- */
 
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
+
+/* --------------------------------
+   Elements
+-------------------------------- */
+
 const pdfInput = document.getElementById("pdfInput");
+
+const uploadBtn = document.getElementById("uploadBtn");
+const welcomeUpload = document.getElementById("welcomeUpload");
+
 const welcome = document.getElementById("welcome");
 const editor = document.getElementById("editor");
-const pdfContainer = document.getElementById("pdfContainer");
 
-const prevPage = document.getElementById("prevPage");
-const nextPage = document.getElementById("nextPage");
-const pageNumber = document.getElementById("pageNumber");
-const pageCount = document.getElementById("pageCount");
+const pdfContainer =
+  document.getElementById("pdfContainer");
 
-const zoomOut = document.getElementById("zoomOut");
-const zoomIn = document.getElementById("zoomIn");
-const fitPage = document.getElementById("fitPage");
-const todayStamp = document.getElementById("todayStamp");
+const prevPage =
+  document.getElementById("prevPage");
+
+const nextPage =
+  document.getElementById("nextPage");
+
+const pageInfo =
+  document.getElementById("pageInfo");
+
+const zoomOut =
+  document.getElementById("zoomOut");
+
+const zoomIn =
+  document.getElementById("zoomIn");
+
+const fitPage =
+  document.getElementById("fitPage");
+
+const zoomInfo =
+  document.getElementById("zoomInfo");
+
+
+/* --------------------------------
+   State
+-------------------------------- */
 
 let pdfDocument = null;
+
 let currentPage = 1;
+
 let zoom = 1;
 
+// Today's date stamp, stored per PDF page.
+// Format: DD/MM/YYYY
+const todayStamp = document.getElementById("todayStamp");
 const pageStamps = new Map();
 let renderVersion = 0;
 
 
 /* --------------------------------
-   Load PDF
+   Upload buttons
+-------------------------------- */
+
+uploadBtn.addEventListener("click", () => {
+  pdfInput.click();
+});
+
+welcomeUpload.addEventListener("click", () => {
+  pdfInput.click();
+});
+
+
+/* --------------------------------
+   PDF selection
 -------------------------------- */
 
 pdfInput.addEventListener("change", async (event) => {
-  const file = event.target.files?.[0];
+
+  const file = event.target.files[0];
 
   if (!file) {
     return;
   }
 
   if (file.type !== "application/pdf") {
+
     alert("Please select a PDF file.");
+
     pdfInput.value = "";
+
     return;
   }
 
   try {
-    const arrayBuffer = await file.arrayBuffer();
 
-    pdfDocument = await pdfjsLib.getDocument({
-      data: arrayBuffer
-    }).promise;
+    const arrayBuffer =
+      await file.arrayBuffer();
+
+    pdfDocument =
+      await pdfjsLib.getDocument({
+        data: arrayBuffer
+      }).promise;
 
     currentPage = 1;
     zoom = 1;
     pageStamps.clear();
 
     welcome.classList.add("hidden");
+
     editor.classList.remove("hidden");
 
-    pageCount.textContent = pdfDocument.numPages;
-
     await renderPage();
+
   } catch (error) {
-    console.error("Failed to load PDF:", error);
-    alert("Unable to open this PDF.");
+
+    console.error(error);
+
+    alert(
+      "The PDF could not be opened."
+    );
+
   }
+
 });
 
 
@@ -83,9 +147,7 @@ function getTodayStampText() {
 
 if (todayStamp) {
   todayStamp.addEventListener("click", async () => {
-    if (!pdfDocument) {
-      return;
-    }
+    if (!pdfDocument) return;
 
     const existing = pageStamps.get(currentPage);
 
@@ -102,12 +164,9 @@ if (todayStamp) {
 function addStampOverlay(container) {
   const stamp = pageStamps.get(currentPage);
 
-  if (!stamp) {
-    return;
-  }
+  if (!stamp) return;
 
   const stampEl = document.createElement("div");
-
   stampEl.className = "today-stamp";
   stampEl.textContent = stamp.text;
 
@@ -115,19 +174,15 @@ function addStampOverlay(container) {
   stampEl.style.top = `${stamp.y * zoom}px`;
 
   let dragging = false;
-
   let startClientX = 0;
   let startClientY = 0;
-
   let startX = stamp.x;
   let startY = stamp.y;
 
   stampEl.addEventListener("pointerdown", (event) => {
     dragging = true;
-
     startClientX = event.clientX;
     startClientY = event.clientY;
-
     startX = stamp.x;
     startY = stamp.y;
 
@@ -140,9 +195,7 @@ function addStampOverlay(container) {
   });
 
   stampEl.addEventListener("pointermove", (event) => {
-    if (!dragging) {
-      return;
-    }
+    if (!dragging) return;
 
     stamp.x = Math.max(
       0,
@@ -159,9 +212,7 @@ function addStampOverlay(container) {
   });
 
   const stopDragging = (event) => {
-    if (!dragging) {
-      return;
-    }
+    if (!dragging) return;
 
     dragging = false;
 
@@ -184,26 +235,18 @@ function addStampOverlay(container) {
 -------------------------------- */
 
 async function renderPage() {
-  if (!pdfDocument) {
-    return;
-  }
+  if (!pdfDocument) return;
 
   const thisRender = ++renderVersion;
-  const pageNumberValue = currentPage;
+  const pageNumber = currentPage;
+  const page = await pdfDocument.getPage(pageNumber);
 
-  const page = await pdfDocument.getPage(pageNumberValue);
-
-  const viewport = page.getViewport({
-    scale: zoom
-  });
+  const viewport = page.getViewport({ scale: zoom });
 
   const canvas = document.createElement("canvas");
-
   canvas.className = "pdf-page";
 
-  const context = canvas.getContext("2d", {
-    alpha: false
-  });
+  const context = canvas.getContext("2d", { alpha: false });
 
   if (!context) {
     throw new Error("Could not create the PDF canvas.");
@@ -214,30 +257,17 @@ async function renderPage() {
     2
   );
 
-  canvas.width =
-    Math.floor(viewport.width * deviceScale);
+  canvas.width = Math.floor(viewport.width * deviceScale);
+  canvas.height = Math.floor(viewport.height * deviceScale);
 
-  canvas.height =
-    Math.floor(viewport.height * deviceScale);
-
-  canvas.style.width =
-    `${viewport.width}px`;
-
-  canvas.style.height =
-    `${viewport.height}px`;
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
 
   const renderContext = {
     canvasContext: context,
     viewport,
     transform: deviceScale !== 1
-      ? [
-          deviceScale,
-          0,
-          0,
-          deviceScale,
-          0,
-          0
-        ]
+      ? [deviceScale, 0, 0, deviceScale, 0, 0]
       : undefined
   };
 
@@ -245,26 +275,18 @@ async function renderPage() {
 
   if (
     thisRender !== renderVersion ||
-    pageNumberValue !== currentPage ||
+    pageNumber !== currentPage ||
     !pdfDocument
   ) {
     return;
   }
 
-  const pageWrapper =
-    document.createElement("div");
-
-  pageWrapper.className =
-    "pdf-page-wrapper";
-
-  pageWrapper.style.width =
-    `${viewport.width}px`;
-
-  pageWrapper.style.height =
-    `${viewport.height}px`;
+  const pageWrapper = document.createElement("div");
+  pageWrapper.className = "pdf-page-wrapper";
+  pageWrapper.style.width = `${viewport.width}px`;
+  pageWrapper.style.height = `${viewport.height}px`;
 
   pageWrapper.appendChild(canvas);
-
   addStampOverlay(pageWrapper);
 
   pdfContainer.replaceChildren(pageWrapper);
@@ -277,44 +299,37 @@ async function renderPage() {
    Page controls
 -------------------------------- */
 
-function updateControls() {
+prevPage.addEventListener("click", async () => {
+
   if (!pdfDocument) {
     return;
   }
 
-  pageNumber.textContent = currentPage;
-
-  pageCount.textContent =
-    pdfDocument.numPages;
-
-  prevPage.disabled =
-    currentPage <= 1;
-
-  nextPage.disabled =
-    currentPage >= pdfDocument.numPages;
-}
-
-prevPage.addEventListener("click", async () => {
-  if (!pdfDocument || currentPage <= 1) {
+  if (currentPage <= 1) {
     return;
   }
 
   currentPage--;
 
   await renderPage();
+
 });
 
+
 nextPage.addEventListener("click", async () => {
-  if (
-    !pdfDocument ||
-    currentPage >= pdfDocument.numPages
-  ) {
+
+  if (!pdfDocument) {
+    return;
+  }
+
+  if (currentPage >= pdfDocument.numPages) {
     return;
   }
 
   currentPage++;
 
   await renderPage();
+
 });
 
 
@@ -322,30 +337,35 @@ nextPage.addEventListener("click", async () => {
    Zoom
 -------------------------------- */
 
-zoomOut.addEventListener("click", async () => {
-  if (!pdfDocument) {
-    return;
-  }
-
-  zoom = Math.max(
-    0.5,
-    zoom - 0.1
-  );
-
-  await renderPage();
-});
-
 zoomIn.addEventListener("click", async () => {
+
   if (!pdfDocument) {
     return;
   }
 
   zoom = Math.min(
-    3,
-    zoom + 0.1
+    zoom + 0.1,
+    3
   );
 
   await renderPage();
+
+});
+
+
+zoomOut.addEventListener("click", async () => {
+
+  if (!pdfDocument) {
+    return;
+  }
+
+  zoom = Math.max(
+    zoom - 0.1,
+    0.5
+  );
+
+  await renderPage();
+
 });
 
 
@@ -354,6 +374,7 @@ zoomIn.addEventListener("click", async () => {
 -------------------------------- */
 
 fitPage.addEventListener("click", async () => {
+
   if (!pdfDocument) {
     return;
   }
@@ -366,58 +387,103 @@ fitPage.addEventListener("click", async () => {
       scale: 1
     });
 
+
   const area =
-    pdfContainer;
+    document.getElementById("pdfArea");
+
 
   const availableWidth =
-    Math.max(
-      area.clientWidth - 40,
-      100
+    area.clientWidth - 40;
+
+
+  zoom =
+    Math.min(
+      availableWidth / unscaled.width,
+      2
     );
 
-  const availableHeight =
-    Math.max(
-      area.clientHeight - 40,
-      100
-    );
-
-  zoom = Math.min(
-    availableWidth / unscaled.width,
-    availableHeight / unscaled.height,
-    2
-  );
-
-  zoom = Math.max(
-    zoom,
-    0.5
-  );
 
   await renderPage();
+
 });
 
 
 /* --------------------------------
-   Keyboard navigation
+   Controls
+-------------------------------- */
+
+function updateControls() {
+
+  pageInfo.textContent =
+    `Page ${currentPage} / ${pdfDocument.numPages}`;
+
+  zoomInfo.textContent =
+    `${Math.round(zoom * 100)}%`;
+
+
+  prevPage.disabled =
+    currentPage <= 1;
+
+  nextPage.disabled =
+    currentPage >= pdfDocument.numPages;
+
+}
+
+
+/* --------------------------------
+   Keyboard shortcuts
 -------------------------------- */
 
 document.addEventListener("keydown", async (event) => {
+
   if (!pdfDocument) {
     return;
   }
 
-  if (event.key === "ArrowLeft") {
-    if (currentPage > 1) {
-      currentPage--;
-      await renderPage();
-    }
+  /*
+    Don't intercept keyboard
+    while typing into an input.
+  */
+
+  const tag =
+    document.activeElement?.tagName;
+
+  if (
+    tag === "INPUT" ||
+    tag === "TEXTAREA"
+  ) {
+    return;
   }
 
-  if (event.key === "ArrowRight") {
-    if (currentPage < pdfDocument.numPages) {
-      currentPage++;
+
+  if (event.key === "ArrowLeft") {
+
+    if (currentPage > 1) {
+
+      currentPage--;
+
       await renderPage();
+
     }
+
   }
+
+
+  if (event.key === "ArrowRight") {
+
+    if (
+      currentPage <
+      pdfDocument.numPages
+    ) {
+
+      currentPage++;
+
+      await renderPage();
+
+    }
+
+  }
+
 });
 
 
@@ -428,18 +494,13 @@ document.addEventListener("keydown", async (event) => {
 let resizeTimer = null;
 
 window.addEventListener("resize", () => {
-  if (!pdfDocument) {
-    return;
-  }
+  if (!pdfDocument) return;
 
   clearTimeout(resizeTimer);
 
   resizeTimer = setTimeout(() => {
     renderPage().catch((error) => {
-      console.error(
-        "PDF re-render failed:",
-        error
-      );
+      console.error("PDF re-render failed:", error);
     });
   }, 120);
 });
