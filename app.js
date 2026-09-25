@@ -71,14 +71,30 @@ async function renderPage(){if(!pdfDocument)return;const ver=++renderVersion,pn=
 function updateControls(){pageInfo.textContent=`Page ${currentPage} / ${pdfDocument?.numPages||1}`;zoomInfo.textContent=`${Math.round(zoom*100)}%`;prevPage.disabled=!pdfDocument||currentPage<=1;nextPage.disabled=!pdfDocument||currentPage>=pdfDocument.numPages;undoBtn.disabled=!history.length;deleteSelected.disabled=!selectedId}
 async function fitCurrentPageToWidth(){if(!pdfDocument)return;const p=await pdfDocument.getPage(currentPage),u=p.getViewport({scale:1}),available=Math.max(180,pdfArea.clientWidth-24),target=Math.min(available/u.width,3);zoom=Math.max(.25,Math.round(target*100)/100);await renderPage()}
 prevPage.onclick=async()=>{if(currentPage>1){currentPage--;selectedId=null;await renderPage();await fitCurrentPageToWidth()}};nextPage.onclick=async()=>{if(pdfDocument&&currentPage<pdfDocument.numPages){currentPage++;selectedId=null;await renderPage();await fitCurrentPageToWidth()}};zoomOut.onclick=async()=>{if(pdfDocument){zoom=Math.max(.25,Math.round((zoom-.1)*10)/10);await renderPage()}};zoomIn.onclick=async()=>{if(pdfDocument){zoom=Math.min(3,Math.round((zoom+.1)*10)/10);await renderPage()}};fitPage.onclick=fitCurrentPageToWidth;undoBtn.onclick=async()=>{if(!history.length)return;restore(history.pop());await renderPage()};
-function dataUrlBytes(data){const part=data.split(",")[1];if(!part)throw Error("Invalid signature image");const b=atob(part);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function dataUrlBytes(data){const part=data.split(",")[1];if(!part)throw Error("Invalid image data");const b=atob(part);const a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function textAnnotationDataUrl(text,fontSize,width,height){
+  const scale=Math.min(Math.max(window.devicePixelRatio||2,2),3);
+  const w=Math.max(1,Math.ceil(width*scale));
+  const h=Math.max(1,Math.ceil(height*scale));
+  const c=document.createElement("canvas"); c.width=w; c.height=h;
+  const ctx=c.getContext("2d"); if(!ctx) throw Error("Text canvas unavailable");
+  ctx.clearRect(0,0,w,h); ctx.scale(scale,scale);
+  const family='-apple-system,BlinkMacSystemFont,"PingFang TC","PingFang SC","Noto Sans CJK TC","Noto Sans CJK SC","Microsoft JhengHei","Microsoft YaHei",Arial,sans-serif';
+  let fs=Math.max(6,Math.min(96,fontSize));
+  ctx.font=`${fs}px ${family}`;
+  const maxW=Math.max(10,width-10);
+  if(ctx.measureText(text).width>maxW){fs=Math.max(6,fs*maxW/ctx.measureText(text).width);ctx.font=`${fs}px ${family}`;}
+  ctx.fillStyle="#111827"; ctx.textBaseline="middle"; ctx.textAlign="left";
+  ctx.fillText(text,5, height/2);
+  return c.toDataURL("image/png");
+}
 let exportWindow=null;
 async function exportDocument(){if(!sourcePdfBytes){alert("Please upload a document first.");return}const L=window.PDFLib;if(!L?.PDFDocument){alert("PDF export library is unavailable. Please reload the page.");return}
 // Open a window during the user gesture. This is important for iPhone/Safari, where a later async download can be blocked.
 try{exportWindow=window.open("about:blank","_blank");if(exportWindow)exportWindow.document.write("<p style='font-family:Arial;padding:24px'>Preparing your PDF…</p>")}catch{exportWindow=null}
 exportPdf.disabled=true;exportPdf.textContent="Exporting…";
-try{const out=await L.PDFDocument.load(sourcePdfBytes),font=await out.embedFont(L.StandardFonts.Helvetica),pages=out.getPages();
-for(let i=0;i<pages.length;i++){const page=pages[i],pw=page.getWidth(),ph=page.getHeight(),scaleX=pw/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).width,scaleY=ph/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).height;for(const a of annotations.get(i+1)||[]){const x=Math.max(0,Math.min(a.x*scaleX,pw-a.w*scaleX)),top=Math.max(0,Math.min(a.y*scaleY,ph-a.h*scaleY)),w=a.w*scaleX,h=a.h*scaleY,y=ph-top-h;if(a.type==="signature"){const img=await out.embedPng(dataUrlBytes(a.data));page.drawImage(img,{x,y,width:w,height:h})}else{const fs=Math.max(6,Math.min(96,a.fontSize*scaleX));page.drawText(a.text,{x:x+5*scaleX,y:y+(h-fs)/2,size:fs,font,color:L.rgb(.067,.094,.153),maxWidth:Math.max(10,w-10*scaleX),lineHeight:fs})}}}
+try{const out=await L.PDFDocument.load(sourcePdfBytes),pages=out.getPages();
+for(let i=0;i<pages.length;i++){const page=pages[i],pw=page.getWidth(),ph=page.getHeight(),scaleX=pw/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).width,scaleY=ph/(await pdfDocument.getPage(i+1)).getViewport({scale:1}).height;for(const a of annotations.get(i+1)||[]){const x=Math.max(0,Math.min(a.x*scaleX,pw-a.w*scaleX)),top=Math.max(0,Math.min(a.y*scaleY,ph-a.h*scaleY)),w=a.w*scaleX,h=a.h*scaleY,y=ph-top-h;if(a.type==="signature"){const img=await out.embedPng(dataUrlBytes(a.data));page.drawImage(img,{x,y,width:w,height:h})}else{const textPng=textAnnotationDataUrl(a.text,a.fontSize*scaleX,w,h);const img=await out.embedPng(dataUrlBytes(textPng));page.drawImage(img,{x,y,width:w,height:h})}}}
 const bytes=await out.save();const blob=new Blob([bytes],{type:"application/pdf"}),url=URL.createObjectURL(blob);const filename=`${sourceFileName}-signed.pdf`;
 if(exportWindow&&!exportWindow.closed){exportWindow.location.href=url;try{exportWindow.document.title=filename}catch{}}else{const link=document.createElement("a");link.href=url;link.download=filename;link.target="_blank";document.body.appendChild(link);link.click();link.remove()}
 setTimeout(()=>URL.revokeObjectURL(url),60000);
