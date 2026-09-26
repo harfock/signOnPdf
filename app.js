@@ -1,5 +1,7 @@
 import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
 pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
+import { getStroke } from "https://cdn.jsdelivr.net/npm/perfect-freehand@1.2.2/+esm";
+
 const $=id=>document.getElementById(id);
 const pdfInput=$("pdfInput"),uploadBtn=$("uploadBtn"),welcomeUpload=$("welcomeUpload"),welcome=$("welcome"),editor=$("editor"),pdfContainer=$("pdfContainer"),pdfArea=$("pdfArea");
 const prevPage=$("prevPage"),nextPage=$("nextPage"),pageInfo=$("pageInfo"),zoomOut=$("zoomOut"),zoomIn=$("zoomIn"),fitPage=$("fitPage"),zoomInfo=$("zoomInfo"),addText=$("addText"),addName=$("addName"),addDate=$("addDate"),addSignature=$("addSignature"),undoBtn=$("undo"),deleteSelected=$("deleteSelected"),exportPdf=$("exportPdf");
@@ -62,18 +64,86 @@ textCancel.onclick=()=>{textDialog.classList.add("hidden");editingId=null};
 textConfirm.onclick=()=>{const v=textInput.value.trim();if(!v)return;if(editingId){const a=currentList().find(x=>x.id===editingId);if(a){commit();a.text=v;renderPage()}}else addTextLike(pendingTextType,v);textDialog.classList.add("hidden");editingId=null};
 textInput.onkeydown=e=>{if(e.key==="Enter")textConfirm.click();if(e.key==="Escape")textCancel.click()};
 let drawing=false,signatureHasInk=false,sigCtx=signatureCanvas.getContext("2d");
-const PEN_STYLES={fine:{width:1.5,cap:"round",join:"round"},ballpoint:{width:2.4,cap:"round",join:"round"},marker:{width:5.2,cap:"round",join:"round"},brush:{width:4.5,cap:"round",join:"round"}};
+const PEN_STYLES={fine:{width:1.5,cap:"round",join:"round"},ballpoint:{width:2.4,cap:"round",join:"round"},marker:{width:5.2,cap:"round",join:"round"},brush:{width:10,cap:"round",join:"round"}};
 let currentPenStyle="fine",currentInk="#111827",lastSigPoint=null,lastSigTime=0;
+let activeStroke=[],signatureStrokes=[];
 function applySignatureBrush(){const st=PEN_STYLES[currentPenStyle]||PEN_STYLES.fine;sigCtx.lineWidth=st.width;sigCtx.lineCap=st.cap;sigCtx.lineJoin=st.join;sigCtx.strokeStyle=currentInk}
-function brushWidth(speed){const min=1.4,max=8.5;return Math.max(min,Math.min(max,max-speed*0.055))}
-function resizeSig(){const r=signatureCanvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);signatureCanvas.width=Math.max(1,Math.round(r.width*d));signatureCanvas.height=Math.max(1,Math.round(r.height*d));sigCtx.setTransform(d,0,0,d,0,0);applySignatureBrush();signatureHasInk=false}
+function resizeSig(){const r=signatureCanvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2);signatureCanvas.width=Math.max(1,Math.round(r.width*d));signatureCanvas.height=Math.max(1,Math.round(r.height*d));sigCtx.setTransform(d,0,0,d,0,0);applySignatureBrush();signatureHasInk=false;signatureStrokes=[];activeStroke=[]}
 function sigPoint(e){const r=signatureCanvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top}}
-function beginSig(e){drawing=true;signatureHasInk=true;const p=sigPoint(e);lastSigPoint=p;lastSigTime=performance.now();sigCtx.beginPath();sigCtx.moveTo(p.x,p.y);signatureCanvas.setPointerCapture?.(e.pointerId);e.preventDefault()}
-function moveSig(e){if(!drawing)return;const p=sigPoint(e);if(currentPenStyle!=="brush"){sigCtx.lineTo(p.x,p.y);sigCtx.stroke()}else{const now=performance.now(),dt=Math.max(1,now-lastSigTime),dist=Math.hypot(p.x-lastSigPoint.x,p.y-lastSigPoint.y),speed=dist/dt;sigCtx.lineWidth=brushWidth(speed);sigCtx.beginPath();sigCtx.moveTo(lastSigPoint.x,lastSigPoint.y);sigCtx.lineTo(p.x,p.y);sigCtx.stroke();lastSigPoint=p;lastSigTime=now}e.preventDefault()}
-function endSig(){drawing=false;lastSigPoint=null}
+function drawFreehandStroke(points,last=true){
+  if(!points.length)return;
+  const brush=currentPenStyle==="brush";
+  const st=PEN_STYLES[currentPenStyle]||PEN_STYLES.fine;
+  const opts=brush?{
+    size:st.width,
+    thinning:0.85,
+    smoothing:0.65,
+    streamline:0.45,
+    simulatePressure:true,
+    easing:t=>t,
+    start:{cap:true,taper:0},
+    end:{cap:true,taper:0},
+    last
+  }:{
+    size:st.width,
+    thinning:0.05,
+    smoothing:0.45,
+    streamline:0.35,
+    simulatePressure:true,
+    start:{cap:true,taper:0},
+    end:{cap:true,taper:0},
+    last
+  };
+  const outline=getStroke(points,opts);
+  if(!outline.length)return;
+  sigCtx.beginPath();
+  sigCtx.moveTo(outline[0][0],outline[0][1]);
+  for(let i=1;i<outline.length;i++)sigCtx.lineTo(outline[i][0],outline[i][1]);
+  sigCtx.closePath();
+  sigCtx.fillStyle=currentInk;
+  sigCtx.fill();
+}
+function redrawSignature(){
+  const w=signatureCanvas.clientWidth,h=signatureCanvas.clientHeight;
+  sigCtx.clearRect(0,0,w,h);
+  for(const stroke of signatureStrokes)drawFreehandStroke(stroke,true);
+  if(activeStroke.length)drawFreehandStroke(activeStroke,false);
+}
+function beginSig(e){
+  drawing=true;signatureHasInk=true;
+  const p=sigPoint(e);
+  activeStroke=[[p.x,p.y,0.5]];
+  lastSigPoint=p;lastSigTime=performance.now();
+  signatureCanvas.setPointerCapture?.(e.pointerId);e.preventDefault();
+}
+function moveSig(e){
+  if(!drawing)return;
+  const p=sigPoint(e);
+  const now=performance.now();
+  const dt=Math.max(1,now-lastSigTime);
+  const dist=Math.hypot(p.x-lastSigPoint.x,p.y-lastSigPoint.y);
+  const speed=dist/dt;
+  // Perfect Freehand can simulate pressure from movement speed. For the brush,
+  // slow movement becomes thicker and fast movement becomes finer.
+  const pressure=currentPenStyle==="brush"?Math.max(0.08,Math.min(1,1-speed*0.16)):0.5;
+  activeStroke.push([p.x,p.y,pressure]);
+  lastSigPoint=p;lastSigTime=now;
+  redrawSignature();
+  e.preventDefault();
+}
+function endSig(){
+  if(!drawing)return;
+  drawing=false;
+  if(activeStroke.length){
+    signatureStrokes.push(activeStroke.slice());
+    activeStroke=[];
+    redrawSignature();
+  }
+  lastSigPoint=null;
+}
 signatureCanvas.addEventListener("pointerdown",beginSig);signatureCanvas.addEventListener("pointermove",moveSig);signatureCanvas.addEventListener("pointerup",endSig);signatureCanvas.addEventListener("pointercancel",endSig);
-penStyleGroup.addEventListener("click",e=>{const b=e.target.closest(".pen-style");if(!b)return;currentPenStyle=b.dataset.style||"fine";penStyleGroup.querySelectorAll(".pen-style").forEach(x=>x.classList.toggle("active",x===b));applySignatureBrush()});
-signatureColorInput.addEventListener("input",()=>{currentInk=signatureColorInput.value||"#111827";applySignatureBrush()});
+penStyleGroup.addEventListener("click",e=>{const b=e.target.closest(".pen-style");if(!b)return;currentPenStyle=b.dataset.style||"fine";penStyleGroup.querySelectorAll(".pen-style").forEach(x=>x.classList.toggle("active",x===b));applySignatureBrush();redrawSignature()});
+signatureColorInput.addEventListener("input",()=>{currentInk=signatureColorInput.value||"#111827";applySignatureBrush();redrawSignature()});
 function getSavedSignatures(){try{return JSON.parse(localStorage.getItem("pdfSignerSignatures")||"[]")}catch{return[]}}
 function saveSignature(data){const list=getSavedSignatures().filter(x=>x!==data);list.unshift(data);localStorage.setItem("pdfSignerSignatures",JSON.stringify(list.slice(0,10)))}
 function renderSavedSignatures(){const list=getSavedSignatures();savedSignatures.innerHTML="";if(!list.length){savedSignatures.innerHTML=`<div class="empty-signatures">${tr("noSavedSignatures")}</div>`;return}const title=document.createElement("div");title.className="signature-label";title.textContent=tr("reuseSignature");savedSignatures.appendChild(title);const grid=document.createElement("div");grid.className="signature-grid";list.forEach(data=>{const b=document.createElement("button");b.className="saved-signature";const img=document.createElement("img");img.src=data;b.appendChild(img);b.onclick=()=>useSignature(data);grid.appendChild(b)});savedSignatures.appendChild(grid)}
