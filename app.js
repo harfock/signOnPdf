@@ -134,19 +134,31 @@ async function saveExportedPdf(){
 }
 async function shareExportedPdf(){
   if(!exportedBlob)return;
-  const file=new File([exportedBlob],exportedFilename,{type:"application/pdf"});
   if(!navigator.share){
     alert("Sharing is not supported by this browser. Use Save to Files instead.");
     return;
   }
+
+  const file=new File([exportedBlob],exportedFilename,{
+    type:"application/pdf",
+    lastModified:Date.now()
+  });
+
   try{
+    // Android browsers can expose navigator.share() but still reject a
+    // particular file. Test the exact PDF before opening the share sheet.
     if(navigator.canShare && !navigator.canShare({files:[file]})){
-      await navigator.share({title:exportedFilename,text:"Signed PDF"});
+      alert("This browser cannot share PDF files directly. The PDF is ready; please use Save to Files, then share it from your Files/Downloads app.");
       return;
     }
-    await navigator.share({files:[file],title:exportedFilename});
+
+    // For file sharing, keep the payload to the PDF itself. Some Android
+    // share implementations are stricter when title/text are included.
+    await navigator.share({files:[file]});
   }catch(e){
-    if(e?.name!=="AbortError")console.error("Share failed:",e);
+    if(e?.name==="AbortError") return;
+    console.error("Share failed:",e);
+    alert("Android could not open the PDF share sheet. Please use Save to Files, then share the saved PDF from Files/Downloads.");
   }
 }
 function openExportedInNewTab(){if(exportedUrl)window.open(exportedUrl,"_blank");}
